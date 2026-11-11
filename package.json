@@ -1,0 +1,36 @@
+{
+  "name": "seatplan",
+  "version": "0.1.0",
+  "description": "Seating-chart optimizer: simulated annealing with an exact branch-and-bound checker. Web app + CLI.",
+  "license": "MIT",
+  "author": "aadijewargi",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aadijewargi/seatplan.git"
+  },
+  "homepage": "https://aadijewargi.github.io/seatplan/",
+  "keywords": ["seating-chart", "optimization", "simulated-annealing", "branch-and-bound", "wedding", "classroom"],
+  "bin": {
+    "seatplan": "dist/cli.js"
+  },
+  "files": ["dist/cli.js"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --serve",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "bench": "node --import tsx bench/bench.ts",
+    "seatplan": "node dist/cli.js",
+    "prepare": "node scripts/build.mjs --cli-only"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.12",
+    "typescript": "^6.0.3"
+  }
+}
