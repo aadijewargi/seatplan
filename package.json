@@ -10,19 +10,28 @@
     "url": "git+https://github.com/aadijewargi/seatplan.git"
   },
   "homepage": "https://aadijewargi.github.io/seatplan/",
-  "keywords": ["seating-chart", "optimization", "simulated-annealing", "branch-and-bound", "wedding", "classroom"],
+  "keywords": [
+    "seating-chart",
+    "optimization",
+    "simulated-annealing",
+    "branch-and-bound",
+    "wedding",
+    "classroom"
+  ],
   "bin": {
     "seatplan": "dist/cli.js"
   },
-  "files": ["dist/cli.js"],
+  "files": [
+    "dist/cli.js"
+  ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs --serve",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "node --import tsx --test \"test/*.test.ts\"",
     "bench": "node --import tsx bench/bench.ts",
     "seatplan": "node dist/cli.js",
     "prepare": "node scripts/build.mjs --cli-only"
