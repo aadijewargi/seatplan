@@ -108,3 +108,12 @@ test("rejects invalid problems with clear errors", () => {
     assert.throws(() => compile(p), (e: unknown) => e instanceof SeatplanError && re.test(e.message), label);
   }
 });
+
+test("weights: undefined entries fall back to defaults; non-numbers are rejected", () => {
+  const p = base();
+  p.relations = [{ a: "Ann", b: "Bob", kind: "like" }];
+  p.weights = { like: undefined, avoid: 2 };
+  assert.equal(compile(p).G[1], 3);
+  p.weights = { like: NaN };
+  assert.throws(() => compile(p), /must be a number/);
+});

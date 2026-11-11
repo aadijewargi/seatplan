@@ -95,7 +95,15 @@ export interface Instance {
 const key = (s: string) => s.trim().toLowerCase();
 
 export function resolveWeights(w?: Partial<Weights>): Weights {
-  return { ...DEFAULT_WEIGHTS, ...(w ?? {}) };
+  const out = { ...DEFAULT_WEIGHTS };
+  for (const k of ["like", "avoid", "tag"] as const) {
+    const v = w?.[k];
+    if (v !== undefined && v !== null) {
+      if (!Number.isFinite(v)) throw new SeatplanError(`Weight "${k}" must be a number.`);
+      out[k] = v;
+    }
+  }
+  return out;
 }
 
 export function compile(problem: Problem): Instance {
