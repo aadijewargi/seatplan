@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>seatplan · seating chart optimizer</title>
+    <meta
+      name="description"
+      content="Turn a guest list into the best seating chart in seconds: couples together, feuds apart, friends at the same table. Runs entirely in your browser."
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="favicon.svg" alt="" width="28" height="28" />
+        <span class="wordmark">seatplan</span>
+        <span class="tagline">the best seating chart, found by optimisation</span>
+      </div>
+      <nav>
+        <a href="https://github.com/aadijewargi/seatplan#how-it-works">How it works</a>
+        <a href="https://github.com/aadijewargi/seatplan">GitHub</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <aside class="setup" aria-label="Setup">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Guests</h2>
+            <div class="row gap-s">
+              <select id="example" aria-label="Load an example"></select>
+              <label class="btn btn-ghost btn-s" for="file">Open CSV…</label>
+              <input id="file" type="file" accept=".csv,.tsv,.txt,text/csv" hidden />
+            </div>
+          </div>
+          <textarea id="csv" spellcheck="false" rows="12" aria-describedby="csv-help"></textarea>
+          <p id="csv-help" class="help">
+            Columns: <code>name</code>, <code>party</code> (sit together), <code>likes</code>,
+            <code>avoid</code>, <code>never</code>, <code>tags</code>, <code>table</code> (lock).
+            Separate several names with <code>;</code>. Excel “Save as CSV” works.
+          </p>
+          <ul id="warnings" class="warnings" aria-live="polite"></ul>
+        </section>
+
+        <section class="panel">
+          <h2>Tables</h2>
+          <input id="tables" type="text" aria-describedby="tables-help" />
+          <p id="tables-help" class="help"><code>6x8</code> = six tables of 8, <code>Head:10</code> = a named table.</p>
+          <p id="seats" class="help strong"></p>
+        </section>
+
+        <section class="panel">
+          <h2>What matters</h2>
+          <div class="weights">
+            <label>Each “likes” <input id="w-like" type="number" min="0" step="0.5" /></label>
+            <label>Each “avoid” <input id="w-avoid" type="number" min="0" step="0.5" /></label>
+            <label>Each shared tag <input id="w-tag" type="number" min="0" step="0.5" /></label>
+          </div>
+          <label class="check"><input id="prove" type="checkbox" /> Prove the result is optimal (small events)</label>
+        </section>
+
+        <div class="actions">
+          <button id="solve" class="btn btn-primary">Find best seating</button>
+          <div class="progress" aria-hidden="true"><div id="bar"></div></div>
+          <canvas id="spark" width="320" height="44" aria-label="Optimisation progress"></canvas>
+          <p id="status" class="status" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+
+      <section class="chart" aria-label="Seating chart">
+        <div class="toolbar">
+          <div class="scorebox">
+            <span class="label">Happiness</span>
+            <span id="score" class="score">–</span>
+            <span id="badge" class="badge" hidden></span>
+          </div>
+          <div class="row gap-s">
+            <button id="reopt" class="btn btn-ghost" disabled title="Optimise again, keeping locked guests in place">Re-optimise</button>
+            <button id="export" class="btn btn-ghost" disabled>Export CSV</button>
+            <button id="print" class="btn btn-ghost" disabled>Print place cards</button>
+          </div>
+        </div>
+        <p id="hint" class="hint">Click a guest to see who they're with. Then click another table to move them (their party moves too). Moved guests are locked.</p>
+        <div id="tables-grid" class="grid"></div>
+        <aside id="detail" class="detail" hidden aria-live="polite"></aside>
+      </section>
+    </main>
+
+    <section id="cards" class="print-cards" aria-hidden="true"></section>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
