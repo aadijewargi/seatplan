@@ -18,11 +18,16 @@ export interface ExactResult {
 
 /**
  * Exact branch and bound. Units are placed one at a time (locked units first,
- * then the most strongly connected). At depth k the upper bound is
+ * then the most strongly connected). A node is pruned when either upper bound
+ * cannot beat the best seating found so far:
  *
- *     current score + sum of positive weights on every pair not yet decided,
+ *   1. current score + every positive weight on a pair not yet decided
+ *      (precomputed suffix sums, O(1));
+ *   2. current score + for each unplaced unit, its best gain at a table with
+ *      room plus half its top-K positive weights, K = seats it could still
+ *      share (O(U*T), much tighter when tables are small).
  *
- * which is cheap (precomputed suffix sums) and valid. Interchangeable empty
+ * Interchangeable empty
  * tables (same capacity, nothing locked there) are tried only once, which
  * removes the factorial table-relabelling symmetry.
  *
@@ -50,6 +55,49 @@ export function solveExact(inst: Instance, opts: ExactOptions = {}): ExactResult
     B[k] = B[k + 1] + s;
   }
 
+  // Per-unit prefix sums of positive weights, largest first: pref[u][k] is the
+  // most u can gain from k tablemates.
+  const pref: Float64Array[] = [];
+  for (let u = 0; u < U; u++) {
+    const ws: number[] = [];
+    for (let v = 0; v < U; v++) if (v !== u && W[u * U + v] > 0) ws.push(W[u * U + v]);
+    ws.sort((x, y) => y - x);
+    const p = new Float64Array(ws.length + 1);
+    ws.forEach((w, i) => (p[i + 1] = p[i] + w));
+    pref.push(p);
+  }
+  // gt[u*T + t] = weight from unit u to the units already placed at table t.
+  const gt = new Float64Array(U * T);
+  const place = (v: number, t: number, sign: 1 | -1) => {
+    for (let u = 0; u < U; u++) gt[u * T + t] += sign * W[u * U + v];
+  };
+
+  /**
+   * Tighter bound: every unplaced unit u gains at most
+   *   max over tables with room of gt[u, t]          (pairs with placed units)
+   *   + half the sum of its best K positive weights   (pairs with unplaced units)
+   * where K is the most tablemates it could still get. Returns -Infinity if
+   * some unit no longer fits anywhere.
+   */
+  const unitBound = (k: number): number => {
+    let maxRoom = 0;
+    for (let t = 0; t < T; t++) maxRoom = Math.max(maxRoom, cap[t] - load[t]);
+    let s = 0;
+    for (let j = k; j < U; j++) {
+      const u = order[j];
+      let bestT = -Infinity;
+      for (let t = 0; t < T; t++) {
+        if (lock[u] >= 0 && t !== lock[u]) continue;
+        if (load[t] + size[u] > cap[t]) continue;
+        if (gt[u * T + t] > bestT) bestT = gt[u * T + t];
+      }
+      if (bestT === -Infinity) return -Infinity;
+      const K = Math.min(maxRoom - size[u], pref[u].length - 1);
+      s += bestT + (K > 0 ? 0.5 * pref[u][K] : 0);
+    }
+    return s;
+  };
+
   const tableHasLock = new Uint8Array(T);
   for (let u = 0; u < U; u++) if (lock[u] >= 0) tableHasLock[lock[u]] = 1;
 
@@ -74,6 +122,7 @@ export function solveExact(inst: Instance, opts: ExactOptions = {}): ExactResult
       return;
     }
     if (cur + B[k] <= bestScore + 1e-9) return;
+    if (cur + unitBound(k) <= bestScore + 1e-9) return;
     const u = order[k];
     const triedEmptyCap = new Set<number>();
     for (let t = 0; t < T; t++) {
@@ -83,14 +132,12 @@ export function solveExact(inst: Instance, opts: ExactOptions = {}): ExactResult
         if (triedEmptyCap.has(cap[t])) continue;
         triedEmptyCap.add(cap[t]);
       }
-      let gain = 0;
-      for (let j = 0; j < k; j++) {
-        const v = order[j];
-        if (assign[v] === t) gain += W[u * U + v];
-      }
+      const gain = gt[u * T + t];
       assign[u] = t;
       load[t] += size[u];
+      place(u, t, 1);
       recurse(k + 1, cur + gain);
+      place(u, t, -1);
       load[t] -= size[u];
       assign[u] = -1;
       if (aborted) return;
