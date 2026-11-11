@@ -88,11 +88,12 @@ function build(): Built {
   const tables = parseTables(el.tables.value);
   const tableNames = new Set(tables.map((t) => t.name));
   const csvLocked = new Set(parsed.guests.filter((g) => g.table).map((g) => g.name));
-  // Drop UI locks that no longer make sense (guest or table removed).
-  for (const [g, t] of Object.entries(state.uiLocks)) {
-    if (!tableNames.has(t) || !parsed.guests.some((x) => x.name === g)) delete state.uiLocks[g];
-  }
-  const guests = parsed.guests.map((g) => (state.uiLocks[g.name] && !g.table ? { ...g, table: state.uiLocks[g.name] } : g));
+  // UI locks to tables that don't exist (e.g. while the layout is being
+  // edited) are ignored but kept, so they come back if the table does.
+  const guests = parsed.guests.map((g) => {
+    const t = state.uiLocks[g.name];
+    return t && !g.table && tableNames.has(t) ? { ...g, table: t } : g;
+  });
   const byParty = new Map<string, string[]>();
   for (const g of guests) {
     const k = g.party?.trim().toLowerCase();
@@ -122,6 +123,19 @@ function refreshInputs() {
     const nSeats = built.problem.tables.reduce((s, t) => s + t.capacity, 0);
     el.seats.textContent = `${nGuests} guests · ${built.problem.tables.length} tables · ${nSeats} seats`;
     el.seats.style.color = nSeats < nGuests ? "var(--bad)" : "";
+    // Compile now so impossible setups (too few seats, a party too big for any
+    // table, contradictory locks) are reported before the user presses Solve.
+    try {
+      if (nGuests) compile(built.problem);
+    } catch (err) {
+      const li = document.createElement("li");
+      li.className = "err";
+      li.textContent = (err as Error).message;
+      el.warnings.append(li);
+      el.solve.disabled = true;
+      save();
+      return;
+    }
     for (const w of built.warnings.slice(0, 30)) {
       const li = document.createElement("li");
       li.textContent = w;
@@ -143,7 +157,7 @@ function refreshInputs() {
 // ---------- solving (in a Web Worker so the page stays responsive) ----------
 let worker: Worker | null = null;
 
-function solve(warm: boolean) {
+function solve(warm: boolean, userStarted = true) {
   refreshInputs();
   if (!built) return;
   worker?.terminate();
@@ -189,6 +203,10 @@ function solve(warm: boolean) {
       el.status.textContent = msg;
       render();
       finish();
+      // On narrow screens the chart is below the form; bring it into view.
+      if (userStarted && window.matchMedia("(max-width: 900px)").matches) {
+        document.querySelector(".chart")?.scrollIntoView({ behavior: "smooth" });
+      }
     } else {
       el.status.textContent = "";
       const li = document.createElement("li");
@@ -259,7 +277,7 @@ function render() {
 
   const legend = document.createElement("div");
   legend.className = "legend";
-  legend.innerHTML = `<span class="l-good">sits with a friend</span><span class="l-lonely">no friend at table</span><span class="l-bad">conflict at table</span><span>📌 locked</span>`;
+  legend.innerHTML = `<span class="l-good">sits with a friend</span><span class="l-lonely">no friend at table</span><span class="l-bad">conflict at table</span><span class="l-lock">📌 locked</span>`;
   el.grid.before(legend);
   document.querySelectorAll(".legend").forEach((n, i, all) => i < all.length - 1 && n.remove());
 
@@ -449,7 +467,9 @@ function moveSelected(tableName: string) {
 
 function renderCards() {
   el.cards.innerHTML = "";
-  for (const g of state.plan?.guests ?? []) {
+  const order = new Map((state.plan?.tables ?? []).map((t, i) => [t.name, i]));
+  const guests = [...(state.plan?.guests ?? [])].sort((a, b) => order.get(a.table)! - order.get(b.table)!);
+  for (const g of guests) {
     const c = document.createElement("div");
     c.className = "place-card";
     const n = document.createElement("div");
@@ -520,7 +540,7 @@ if (!load()) {
   el.tag.value = String(DEFAULT_WEIGHTS.tag);
   loadExample("wedding");
   // First visit: solve the example straight away so there is something to see.
-  solve(false);
+  solve(false, false);
 } else {
   refreshInputs();
   render();
