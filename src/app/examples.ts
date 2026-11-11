@@ -63,7 +63,7 @@ Max Schmidt,,Pia Schmidt,,,school-sam,
 
 const classroom = `name,likes,avoid,never,tags
 Ava,Mia;Zara,,,robotics
-Ben,Leo,,Kai,football
+Ben,Finn,,Kai,football
 Cleo,Ava,,,art
 Dev,Omar,Ben,,robotics
 Ella,Cleo;Ivy,,,art
