@@ -103,12 +103,10 @@ for (const guests of [50, 100, 200, 400]) {
     const inst = compile(p);
     T = inst.T;
     const score = (a: Int32Array) => {
-      const o = objective(inst, a);
-      const v = Math.round(Math.max(0, -Math.floor((o - inst.intra) / inst.HARD)));
-      // Recover soft score: objective = soft - HARD * violations.
+      // Recover the soft score: objective = soft - HARD * violations.
       let viol = 0;
       for (const [x, y] of inst.neverPairs) if (a[inst.unitOf[x]] === a[inst.unitOf[y]]) viol++;
-      return { soft: o + viol * inst.HARD, viol, v };
+      return { soft: objective(inst, a) + viol * inst.HARD, viol };
     };
     const r = score(pack(inst, mulberry32(s), 1)!);
     const g = score(greedy(inst, mulberry32(s)));
