@@ -80,6 +80,50 @@ export class State {
     this.load[b] += size[u];
     this.assign[u] = b;
   }
+  private journal: Array<[number, number]> = [];
+  /**
+   * Move u to table b and send a random set of b's movable units to u's old
+   * table so that both tables stay within capacity. Applies the change and
+   * returns its score delta, or returns null (and changes nothing) if no
+   * valid exchange was found. `undo()` reverts the last exchange.
+   */
+  exchange(u: number, b: number, rng: Rng): number | null {
+    const { U, size, cap, lock } = this.inst;
+    const a = this.assign[u];
+    const need = this.load[b] + size[u] - cap[b];
+    const back: number[] = [];
+    if (need > 0) {
+      const cand: number[] = [];
+      for (let w = 0; w < U; w++) if (this.assign[w] === b && lock[w] < 0) cand.push(w);
+      let got = 0;
+      while (got < need && cand.length) {
+        const k = randInt(rng, cand.length);
+        const w = cand[k];
+        cand[k] = cand[cand.length - 1];
+        cand.pop();
+        back.push(w);
+        got += size[w];
+      }
+      if (got < need) return null;
+      if (this.load[a] - size[u] + got > cap[a]) return null;
+    }
+    this.journal = [[u, a]];
+    let delta = this.moveDelta(u, b);
+    this.move(u, b);
+    for (const w of back) {
+      this.journal.push([w, b]);
+      delta += this.moveDelta(w, a);
+      this.move(w, a);
+    }
+    return delta;
+  }
+  undo(): void {
+    for (let k = this.journal.length - 1; k >= 0; k--) {
+      const [w, from] = this.journal[k];
+      this.move(w, from);
+    }
+    this.journal = [];
+  }
   canMove(u: number, b: number): boolean {
     return this.load[b] + this.inst.size[u] <= this.inst.cap[b];
   }
@@ -187,6 +231,7 @@ export function anneal(inst: Instance, opts: AnnealOptions = {}): AnnealResult {
     const { t0, tEnd } = calibrate(st, movable, rng);
     const alpha = Math.pow(tEnd / t0, 1 / iterations);
     let temp = t0;
+    const moveShare = 0.5;
 
     for (let it = 0; it < iterations; it++, temp *= alpha) {
       if (it > 0 && it % every === 0) {
@@ -208,15 +253,32 @@ export function anneal(inst: Instance, opts: AnnealOptions = {}): AnnealResult {
       let delta: number;
       let v = -1;
       let b = -1;
-      if (rng() < 0.5) {
+      const kind = rng();
+      if (kind < 0.85 * moveShare) {
         b = randInt(rng, T - 1);
         if (b >= assign[u]) b++;
         if (!st.canMove(u, b)) continue;
         delta = st.moveDelta(u, b);
-      } else {
+      } else if (kind < 0.85) {
         v = movable[randInt(rng, movable.length)];
         if (assign[v] === assign[u] || !st.canSwap(u, v)) continue;
         delta = st.swapDelta(u, v);
+      } else {
+        // Exchange: u goes to table b, and enough of b's units come back to
+        // make room. Lets a couple trade places with two singles, etc.
+        b = randInt(rng, T - 1);
+        if (b >= assign[u]) b++;
+        const d = st.exchange(u, b, rng);
+        if (d === null) continue;
+        if (d >= 0 || rng() < Math.exp(d / temp)) {
+          cur += d;
+          accepted++;
+          if (cur > bestScore + 1e-9) {
+            bestScore = cur;
+            best = assign.slice();
+          }
+        } else st.undo();
+        continue;
       }
       if (delta >= 0 || rng() < Math.exp(delta / temp)) {
         if (v < 0) st.move(u, b);

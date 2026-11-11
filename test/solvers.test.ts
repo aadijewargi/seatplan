@@ -121,6 +121,27 @@ test("simulated annealing finds the brute-force optimum on every small case", ()
   assert.equal(hit, cases.length);
 });
 
+test("annealing reaches the proven optimum when tables are exactly full of couples", () => {
+  // With no empty seats, a couple can only change tables by trading places
+  // with two singles; this guards the "exchange" move that makes that possible.
+  for (let s = 1; s <= 10; s++) {
+    const p = generateProblem(16000 + s, {
+      guests: 16,
+      tableSize: 4,
+      partyRate: 0.2,
+      likesPerGuest: 2,
+      avoidsPerGuest: 0.6,
+      nevers: 2,
+      circles: 3,
+    });
+    const inst = compile(p);
+    const ex = solveExact(inst);
+    assert.equal(ex.optimal, true);
+    const sa = anneal(inst, { seed: s });
+    assert.ok(close(sa.score, ex.score), `seed ${s}: anneal ${sa.score} vs optimum ${ex.score}`);
+  }
+});
+
 test("annealing respects capacities, parties and locks, and avoids never-pairs when possible", () => {
   for (const p of cases) {
     const inst = compile(p);
